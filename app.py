@@ -1,59 +1,41 @@
-from flask import Flask, request, jsonify, send_file, render_template
-import yt_dlp
+from flask import Flask, request, render_template, send_file
+import subprocess
 import os
 
 app = Flask(__name__)
 
-DOWNLOAD_FOLDER = 'downloads'
-if not os.path.exists(DOWNLOAD_FOLDER):
-    os.makedirs(DOWNLOAD_FOLDER)
-
-@app.route('/')
+@app.route("/", methods=["GET", "POST"])
 def index():
-    return render_template('index.html')  # A HTML fájl neve
+    if request.method == "POST":
+        url = request.form.get("url")
+        file_format = request.form.get("format")
+        
+        try:
+            file_name = "video.mp4" if file_format == "mp4" else "audio.mp3"
+            os.makedirs("downloads", exist_ok=True)
 
-@app.route('/download', methods=['POST'])
-def download_video():
-    try:
-        data = request.json
-        video_url = data.get('url')
-        if not video_url:
-            return jsonify({'error': 'No URL provided'}), 400
+            result = subprocess.run(
+                [
+                    "yt-dlp",
+                    "--cookies", "cookies.txt",
+                    "-f", "bestaudio/best" if file_format == "mp3" else "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4",
+                    "-o", f"downloads/{file_name}",
+                    url
+                ],
+                capture_output=True,
+                text=True
+            )
 
-        output_format = data.get('format', 'mp4')  # Alapértelmezett formátum MP4
-        options = {
-            'outtmpl': os.path.join(DOWNLOAD_FOLDER, '%(title)s.%(ext)s'),
-        }
+            if result.returncode != 0:
+                error_message = result.stderr
+                return render_template("converter.html", error=error_message)
 
-        # Formátum beállítása
-        if output_format == 'mp3':
-            options['format'] = 'bestaudio/best'
-            options['postprocessors'] = [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }]
-        elif output_format == 'mp4':
-            options['format'] = 'bestvideo+bestaudio/best'
+            return send_file(f"downloads/{file_name}", as_attachment=True)
+        
+        except Exception as e:
+            return render_template("converter.html", error=str(e))
 
-        # Fájl letöltése
-        with yt_dlp.YoutubeDL(options) as ydl:
-            info = ydl.extract_info(video_url, download=True)
-            file_path = ydl.prepare_filename(info)
-            if output_format == 'mp3':
-                file_path = file_path.replace('.webm', '.mp3').replace('.mp4', '.mp3')
+    return render_template("converter.html")
 
-        return jsonify({'message': 'Download complete', 'file_path': file_path})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/file/<filename>', methods=['GET'])
-def get_file(filename):
-    file_path = os.path.join(DOWNLOAD_FOLDER, filename)
-    if os.path.exists(file_path):
-        return send_file(file_path, as_attachment=True)
-    else:
-        return jsonify({'error': 'File not found'}), 404
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    app.run(debug=True)
