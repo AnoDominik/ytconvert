@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Converter</title>
+</head>
+<body>
+    <h1>Welcome to the Video Converter</h1>
+    <form id="converter-form">
+        <label for="url">Video URL:</label>
+        <input type="text" id="url" name="url" required>
+        <label for="format">Format:</label>
+        <select id="format" name="format">
+            <option value="mp4">MP4</option>
+            <option value="mp3">MP3</option>
+        </select>
+        <button type="submit">Convert</button>
+    </form>
+    <p id="message"></p>
+</body>
+<script>
+    const form = document.getElementById('converter-form');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const url = document.getElementById('url').value;
+        const format = document.getElementById('format').value;
+        const message = document.getElementById('message');
+        try {
+            const response = await fetch('/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, format }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                message.innerHTML = `Download complete. <a href="/file/${data.file_path.split('/').pop()}" target="_blank">Click here</a> to download.`;
+            } else {
+                message.innerHTML = `Error: ${data.error}`;
+            }
+        } catch (error) {
+            message.innerHTML = `Error: ${error.message}`;
+        }
+    });
+</script>
+</html>
