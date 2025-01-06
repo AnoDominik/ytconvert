@@ -1,0 +1,11 @@
+result = subprocess.run(
+    [
+        "yt-dlp",
+        "--cookies", "cookies.txt",  # Hozzáadjuk a cookie fájlt
+        "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4",
+        "-o", f"downloads/{file_name}",
+        url
+    ],
+    capture_output=True,
+    text=True
+)
